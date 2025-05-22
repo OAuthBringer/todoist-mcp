@@ -95,5 +95,79 @@ class TodoistMCPServer:
         if not self.has_tool(tool_name):
             raise ValueError(f"Tool '{tool_name}' not found")
         
-        method = getattr(self.api, tool_name)
-        return method(**kwargs)
+        # Get the actual API method
+        tool_method = getattr(self.api, tool_name)
+        result = tool_method(**kwargs)
+        
+        # Convert results to JSON-serializable format
+        if tool_name == 'get_projects':
+            # Handle both real API (ResultsPaginator) and mock (list) results
+            if hasattr(result, '__iter__') and not isinstance(result, list):
+                # Real API: ResultsPaginator yields pages, flatten to get individual projects
+                projects = []
+                for page in result:
+                    projects.extend(page)
+                return [self._project_to_dict(p) for p in projects]
+            else:
+                # Mock API: already a list of projects
+                return [self._project_to_dict(p) for p in result]
+        elif tool_name == 'get_project':
+            return self._project_to_dict(result)
+        elif tool_name in ['get_tasks', 'get_task']:
+            if tool_name == 'get_tasks':
+                # Handle both real API (ResultsPaginator) and mock (list) results
+                if hasattr(result, '__iter__') and not isinstance(result, list):
+                    # Real API: paginated results
+                    tasks = []
+                    for page in result:
+                        tasks.extend(page)
+                    return [self._task_to_dict(t) for t in tasks]
+                else:
+                    # Mock API: already a list
+                    return [self._task_to_dict(t) for t in result]
+            else:
+                return self._task_to_dict(result)
+        elif tool_name in ['add_project', 'add_task', 'update_task']:
+            if hasattr(result, 'id'):
+                return self._project_to_dict(result) if 'project' in tool_name else self._task_to_dict(result)
+        
+        return result
+    
+    def _project_to_dict(self, project):
+        """Convert Project object to dictionary."""
+        if isinstance(project, dict):
+            return project  # Already a dict
+        if isinstance(project, str):
+            return project  # Mock return value
+        return {
+            'id': project.id,
+            'name': project.name,
+            'description': project.description,
+            'color': project.color,
+            'is_shared': project.is_shared,
+            'is_favorite': project.is_favorite,
+            'order': project.order
+        }
+    
+    def _task_to_dict(self, task):
+        """Convert Task object to dictionary."""
+        if isinstance(task, dict):
+            return task  # Already a dict
+        if isinstance(task, str):
+            return task  # Mock return value
+        return {
+            'id': task.id,
+            'content': task.content,
+            'description': task.description,
+            'project_id': task.project_id,
+            'is_completed': task.is_completed,
+            'priority': task.priority
+        }
+
+    def run(self):
+        """Run the MCP server."""
+        self.mcp.run()
+
+def main():
+    server = TodoistMCPServer()
+    server.run()
