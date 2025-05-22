@@ -3,15 +3,23 @@
 from typing import Any, Dict, Optional
 from fastmcp import FastMCP
 from todoist_api_python.api import TodoistAPI
+from .auth import AuthManager
 
 
 class TodoistMCPServer:
     """FastMCP server wrapping Todoist API."""
     
-    def __init__(self, token: str):
+    def __init__(self, token: Optional[str] = None):
         """Initialize server with Todoist API token."""
         self.mcp = FastMCP("Todoist MCP Server")
-        self.api = TodoistAPI(token)
+        
+        if token:
+            api_token = token
+        else:
+            auth_manager = AuthManager()
+            api_token = auth_manager.get_token()
+        
+        self.api = TodoistAPI(api_token)
         self._generated_tools = set()
         self._register_core_tools()
     
