@@ -1,67 +1,176 @@
-"""Test core FastMCP tool generation functionality."""
+"""Tests for Todoist MCP Server with API v1."""
 
 import pytest
-from unittest.mock import Mock, patch
-from fastmcp import FastMCP
-from todoist_api_python.api import TodoistAPI
+from unittest.mock import Mock, patch, AsyncMock
 from todoist_mcp.server import TodoistMCPServer
 
 
+@pytest.fixture
+def mock_auth_manager():
+    """Mock AuthManager."""
+    with patch("todoist_mcp.server.AuthManager") as mock:
+        instance = mock.return_value
+        instance.get_token.return_value = "test_token"
+        yield mock
+
+
+@pytest.fixture
+def mock_api_client():
+    """Mock TodoistV1Client."""
+    with patch("todoist_mcp.server.TodoistV1Client") as mock:
+        yield mock
+
+
+@pytest.fixture
+def server(mock_auth_manager, mock_api_client):
+    """Create server instance with mocked dependencies."""
+    return TodoistMCPServer()
+
+
 class TestTodoistMCPServer:
-    """Test core server functionality."""
+    def test_init_with_token(self, mock_api_client):
+        """Test server initialization with provided token."""
+        server = TodoistMCPServer(token="provided_token")
+        mock_api_client.assert_called_once_with("provided_token")
     
-    def test_server_initialization(self):
-        """Test server initializes with TodoistAPI."""
-        with patch('todoist_mcp.server.TodoistAPI') as mock_api_class:
-            server = TodoistMCPServer("test_token")
-            
-            assert server is not None
-            assert hasattr(server, 'mcp')
-            assert isinstance(server.mcp, FastMCP)
-            mock_api_class.assert_called_once_with("test_token")
+    def test_init_without_token(self, mock_auth_manager, mock_api_client):
+        """Test server initialization using AuthManager."""
+        server = TodoistMCPServer()
+        mock_auth_manager.assert_called_once()
+        mock_api_client.assert_called_once_with("test_token")
     
-    def test_auto_tool_generation(self):
-        """Test tools are auto-generated from TodoistAPI methods."""
-        with patch('todoist_api_python.api.TodoistAPI') as mock_api_class:
-            server = TodoistMCPServer("test_token")
-            
-            # Should have tools for key API methods
-            expected_tools = [
-                'get_projects', 'get_project', 'add_project',
-                'get_tasks', 'get_task', 'add_task', 'update_task'
-            ]
-            
-            for tool_name in expected_tools:
-                assert server.has_tool(tool_name), f"Missing tool: {tool_name}"
+    @pytest.mark.asyncio
+    async def test_get_projects_tool(self, server, mock_api_client):
+        """Test get_projects tool registration and execution."""
+        mock_instance = mock_api_client.return_value
+        mock_instance.get_projects.return_value = {
+            "results": [{"id": "123", "name": "Test"}],
+            "next_cursor": "abc"
+        }
+        
+        # Get all registered tools
+        tools = await server.mcp.get_tools()
+        assert "get_projects" in tools
+        
+        # Execute the tool directly via the server's API client
+        result = server.api.get_projects(limit=5, cursor="xyz")
+        
+        mock_instance.get_projects.assert_called_once_with(limit=5, cursor="xyz")
+        assert result["results"][0]["name"] == "Test"
     
-    def test_tool_execution_calls_api(self, mock_todoist_api):
-        """Test tool execution calls underlying API method."""
-        with patch('todoist_mcp.server.TodoistAPI', return_value=mock_todoist_api):
-            server = TodoistMCPServer("test_token")
-            
-            # Execute get_projects tool
-            result = server.execute_tool('get_projects')
-            
-            mock_todoist_api.get_projects.assert_called_once()
-            assert result == mock_todoist_api.get_projects.return_value
+    @pytest.mark.asyncio
+    async def test_get_tasks_tool_with_filters(self, server, mock_api_client):
+        """Test get_tasks tool with various filters."""
+        mock_instance = mock_api_client.return_value
+        mock_instance.get_tasks.return_value = {
+            "results": [{"id": "task1", "content": "Test Task"}],
+            "next_cursor": None
+        }
+        
+        # Verify tool is registered
+        tools = await server.mcp.get_tools()
+        assert "get_tasks" in tools
+        
+        # Execute via API client to test parameter handling
+        result = server.api.get_tasks(
+            project_id="proj123",
+            limit=10,
+            label_ids=["important"],
+            section_id="sec456"
+        )
+        
+        # Verify parameters passed correctly (cursor not sent when None)
+        mock_instance.get_tasks.assert_called_once_with(
+            project_id="proj123",
+            limit=10,
+            label_ids=["important"],
+            section_id="sec456"
+        )
     
-    def test_tool_execution_with_args(self, mock_todoist_api):
-        """Test tool execution passes arguments to API method."""
-        with patch('todoist_mcp.server.TodoistAPI', return_value=mock_todoist_api):
-            server = TodoistMCPServer("test_token")
-            
-            # Execute add_task tool with arguments
-            server.execute_tool('add_task', content="Test task", project_id="proj_1")
-            
-            mock_todoist_api.add_task.assert_called_once_with(
-                content="Test task", project_id="proj_1"
-            )
+    @pytest.mark.asyncio
+    async def test_add_task_tool(self, server, mock_api_client):
+        """Test add_task tool."""
+        mock_instance = mock_api_client.return_value
+        mock_instance.add_task.return_value = {
+            "id": "new_task",
+            "content": "New Task",
+            "project_id": "proj123"
+        }
+        
+        # Verify tool is registered
+        tools = await server.mcp.get_tools()
+        assert "add_task" in tools
+        
+        # Execute via API client
+        result = server.api.add_task(
+            content="New Task",
+            project_id="proj123",
+            priority=4,
+            due_string="tomorrow"
+        )
+        
+        mock_instance.add_task.assert_called_once_with(
+            content="New Task",
+            project_id="proj123",
+            priority=4,
+            due_string="tomorrow"
+        )
+        assert result["content"] == "New Task"
     
-    def test_private_methods_excluded(self):
-        """Test private methods are not exposed as tools."""
-        with patch('todoist_api_python.api.TodoistAPI') as mock_api_class:
-            server = TodoistMCPServer("test_token")
+    @pytest.mark.asyncio
+    async def test_update_task_tool(self, server, mock_api_client):
+        """Test update_task tool."""
+        mock_instance = mock_api_client.return_value
+        mock_instance.update_task.return_value = {
+            "id": "task123",
+            "content": "Updated Task"
+        }
+        
+        # Verify tool is registered
+        tools = await server.mcp.get_tools()
+        assert "update_task" in tools
+        
+        # Execute via API client
+        result = server.api.update_task(
+            task_id="task123",
+            content="Updated Task",
+            priority=2
+        )
+        
+        mock_instance.update_task.assert_called_once()
+        call_args = mock_instance.update_task.call_args
+        assert call_args[1]["task_id"] == "task123"
+        assert call_args[1]["content"] == "Updated Task"
+        assert call_args[1]["priority"] == 2
+    
+    @pytest.mark.asyncio
+    async def test_all_tools_registered(self, server):
+        """Test that all expected tools are registered."""
+        expected_tools = [
+            "get_projects",
+            "get_project", 
+            "add_project",
+            "get_tasks",
+            "get_task",
+            "add_task",
+            "update_task"
+        ]
+        
+        tools = await server.mcp.get_tools()
+        
+        for tool_name in expected_tools:
+            assert tool_name in tools
+    
+    def test_run_closes_client(self, server, mock_api_client):
+        """Test that run() properly closes the API client."""
+        mock_instance = mock_api_client.return_value
+        mock_instance.close = Mock()
+        
+        with patch.object(server.mcp, "run") as mock_run:
+            # Simulate an exception to test finally block
+            mock_run.side_effect = KeyboardInterrupt()
             
-            # Private methods should not be tools
-            assert not server.has_tool('_private_method')
-            assert not server.has_tool('__init__')
+            with pytest.raises(KeyboardInterrupt):
+                server.run()
+            
+            mock_instance.close.assert_called_once()

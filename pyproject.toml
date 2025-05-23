@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "todoist-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "FastMCP server for Todoist API integration"
 authors = [{name = "OAuthBringer", email = "your.email@example.com"}]
 license = {text = "MIT"}
@@ -21,7 +21,7 @@ classifiers = [
 
 dependencies = [
     "fastmcp>=2.3.3",
-    "todoist-api-python>=3.1.0",
+    "httpx>=0.25.0",
 ]
 
 [project.optional-dependencies]
@@ -31,6 +31,7 @@ dev = [
     "pytest-mock>=3.10.0",
     "black>=23.0.0",
     "ruff>=0.1.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.urls]
@@ -38,7 +39,7 @@ Homepage = "https://github.com/OAuthBringer/todoist-mcp"
 Repository = "https://github.com/OAuthBringer/todoist-mcp"
 
 [project.scripts]
-todoist-mcp = "todoist_mcp.server:main"
+todoist-mcp = "todoist_mcp.__init__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
