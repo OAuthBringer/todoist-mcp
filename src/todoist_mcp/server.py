@@ -5,7 +5,6 @@ from fastmcp import FastMCP
 from .api_v1 import TodoistV1Client
 from .auth import AuthManager
 
-
 class TodoistMCPServer:
     """FastMCP server wrapping Todoist unified API v1."""
     
@@ -151,6 +150,25 @@ class TodoistMCPServer:
         async def delete_comment(comment_id: str):
             """Delete a comment."""
             return self.api.delete_comment(comment_id=comment_id)
+        
+        @self.mcp.tool(name="move_task")
+        async def move_task(
+            task_id: str,
+            project_id: Optional[str] = None,
+            section_id: Optional[str] = None,
+            parent_id: Optional[str] = None
+        ):
+            """Move a task to a different project, section, or parent."""
+            # Validation: must specify at least one target
+            if not any([project_id, section_id, parent_id]):
+                raise ValueError("Must specify at least one target: project_id, section_id, or parent_id")
+            
+            return self.api.move_task(
+                task_id=task_id,
+                project_id=project_id,
+                section_id=section_id,
+                parent_id=parent_id
+            )
     
     def run(self, **kwargs):
         """Run the server."""

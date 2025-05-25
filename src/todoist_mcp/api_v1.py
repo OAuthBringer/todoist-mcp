@@ -8,6 +8,7 @@ class TodoistV1Client:
     """Direct client for Todoist unified API v1."""
     
     BASE_URL = "https://api.todoist.com/api/v1"
+    V2_URL = "https://api.todoist.com/api/v2"
     
     def __init__(self, token: str):
         self.token = token
@@ -47,6 +48,20 @@ class TodoistV1Client:
         response = self.client.post(f"{self.BASE_URL}/projects", json=data)
         response.raise_for_status()
         return response.json()
+    
+    def update_project(self, project_id: str, **kwargs) -> Dict[str, Any]:
+        """Update an existing project."""
+        data = {k: v for k, v in kwargs.items() if v is not None}
+        
+        response = self.client.post(f"{self.BASE_URL}/projects/{project_id}", json=data)
+        response.raise_for_status()
+        return response.json()
+    
+    def delete_project(self, project_id: str) -> None:
+        """Delete a project."""
+        response = self.client.delete(f"{self.V2_URL}/projects/{project_id}")
+        response.raise_for_status()
+        return None
     
     def get_tasks(self, project_id: Optional[str] = None, limit: Optional[int] = None,
                   cursor: Optional[str] = None, **filters) -> Dict[str, Any]:
@@ -146,6 +161,25 @@ class TodoistV1Client:
         response.raise_for_status()
         # Delete operations typically return no content
         return None
+    
+    def move_task(self, task_id: str, project_id: Optional[str] = None,
+                  section_id: Optional[str] = None, parent_id: Optional[str] = None) -> Dict[str, Any]:
+        """Move a task to a different project, section, or parent."""
+        # Validation: must specify at least one target
+        if not any([project_id, section_id, parent_id]):
+            raise ValueError("Must specify at least one target: project_id, section_id, or parent_id")
+        
+        data = {}
+        if project_id:
+            data["project_id"] = project_id
+        if section_id:
+            data["section_id"] = section_id
+        if parent_id:
+            data["parent_id"] = parent_id
+        
+        response = self.client.post(f"{self.BASE_URL}/tasks/{task_id}/move", json=data)
+        response.raise_for_status()
+        return response.json()
     
     def close(self):
         """Close the HTTP client."""

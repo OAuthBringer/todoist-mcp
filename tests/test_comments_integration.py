@@ -5,6 +5,7 @@ import os
 from dotenv import load_dotenv
 from todoist_mcp.server import TodoistMCPServer
 from todoist_mcp.auth import AuthManager
+from .conftest_integration import test_project_manager, cleanup_test_projects
 
 # Load environment variables from .env file
 load_dotenv()
@@ -23,20 +24,9 @@ def server():
 
 
 @pytest.fixture
-def test_project(server):
+def test_project(server, test_project_manager):
     """Create a test project for comment testing."""
-    project = server.api.add_project(
-        name="Test Project - Comments Integration",
-        color="red"
-    )
-    yield project
-    # Cleanup: Delete test project after tests
-    try:
-        # Note: Todoist API doesn't have direct project delete in v1
-        # Would need to use v2 or mark as archived
-        pass
-    except Exception:
-        pass
+    return test_project_manager("Comments")
 
 
 @pytest.fixture  
