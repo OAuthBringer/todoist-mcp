@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "todoist-mcp"
-version = "0.2.0"
+version = "0.3.0"
 description = "FastMCP server for Todoist API integration"
 authors = [{name = "OAuthBringer", email = "your.email@example.com"}]
 license = {text = "MIT"}
@@ -48,6 +48,9 @@ where = ["src"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 asyncio_mode = "auto"
+markers = [
+    "integration: marks tests as integration tests requiring real API (deselect with '-m \"not integration\"')",
+]
 
 [tool.black]
 line-length = 88
