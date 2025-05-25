@@ -5,11 +5,15 @@ MCP server for Todoist API integration. Published to [PyPI](https://pypi.org/pro
 ## Status
 ✅ **Full Functionality** - Now using Todoist unified API v1 with proper pagination support
 
+**v0.3.0** - Added Comment CRUD operations and Task Move functionality
+
 ## Features
-- Full cursor-based pagination for tasks and projects
+- Full cursor-based pagination for tasks, projects, and comments
 - Configurable limit parameter for all list endpoints
 - Multi-auth support (environment, config file, runtime)
 - Complete task and project management capabilities
+- Comment CRUD operations for tasks and projects
+- Move tasks between projects, sections, and parents
 - Error handling with detailed error messages
 
 ## Installation
@@ -92,6 +96,14 @@ Authentication options (in order of precedence):
 - `get_task` - Get single task by ID
 - `add_task` - Create new task
 - `update_task` - Update existing task
+- `move_task` - Move task to different project, section, or parent
+
+### Comments
+- `get_comments` - List comments for task/project with pagination
+- `get_comment` - Get single comment by ID
+- `add_comment` - Add comment to task or project
+- `update_comment` - Update existing comment
+- `delete_comment` - Delete a comment
 
 ## Technical Details
 - Built with FastMCP v2.3.3+
