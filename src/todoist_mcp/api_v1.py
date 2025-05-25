@@ -91,6 +91,62 @@ class TodoistV1Client:
         response.raise_for_status()
         return response.json()
     
+    def get_comments(self, task_id: Optional[str] = None, project_id: Optional[str] = None,
+                    limit: Optional[int] = None, cursor: Optional[str] = None) -> Dict[str, Any]:
+        """Get comments with pagination support."""
+        params = {}
+        if task_id:
+            params["task_id"] = task_id
+        if project_id:
+            params["project_id"] = project_id
+        if limit:
+            params["limit"] = limit
+        if cursor:
+            params["cursor"] = cursor
+        
+        response = self.client.get(f"{self.BASE_URL}/comments", params=params)
+        response.raise_for_status()
+        return response.json()
+    
+    def add_comment(self, content: str, task_id: Optional[str] = None,
+                   project_id: Optional[str] = None) -> Dict[str, Any]:
+        """Create a new comment."""
+        # Validation: must specify exactly one of task_id or project_id
+        if task_id and project_id:
+            raise ValueError("Comment must be for either task or project, not both")
+        if not task_id and not project_id:
+            raise ValueError("Must specify either task_id or project_id")
+        
+        data = {"content": content}
+        if task_id:
+            data["task_id"] = task_id
+        if project_id:
+            data["project_id"] = project_id
+        
+        response = self.client.post(f"{self.BASE_URL}/comments", json=data)
+        response.raise_for_status()
+        return response.json()
+    
+    def get_comment(self, comment_id: str) -> Dict[str, Any]:
+        """Get a single comment."""
+        response = self.client.get(f"{self.BASE_URL}/comments/{comment_id}")
+        response.raise_for_status()
+        return response.json()
+    
+    def update_comment(self, comment_id: str, content: str) -> Dict[str, Any]:
+        """Update an existing comment."""
+        data = {"content": content}
+        response = self.client.post(f"{self.BASE_URL}/comments/{comment_id}", json=data)
+        response.raise_for_status()
+        return response.json()
+    
+    def delete_comment(self, comment_id: str) -> None:
+        """Delete a comment."""
+        response = self.client.delete(f"{self.BASE_URL}/comments/{comment_id}")
+        response.raise_for_status()
+        # Delete operations typically return no content
+        return None
+    
     def close(self):
         """Close the HTTP client."""
         self.client.close()

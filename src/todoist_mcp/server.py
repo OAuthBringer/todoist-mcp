@@ -104,6 +104,53 @@ class TodoistMCPServer:
                 due_date=due_date, due_datetime=due_datetime, due_lang=due_lang,
                 assignee_id=assignee_id, duration=duration, duration_unit=duration_unit
             )
+        
+        @self.mcp.tool(name="get_comments")
+        async def get_comments(
+            task_id: Optional[str] = None,
+            project_id: Optional[str] = None,
+            limit: Optional[int] = None,
+            cursor: Optional[str] = None
+        ):
+            """Get comments for a task or project with optional pagination."""
+            return self.api.get_comments(
+                task_id=task_id, project_id=project_id,
+                limit=limit, cursor=cursor
+            )
+        
+        @self.mcp.tool(name="add_comment")
+        async def add_comment(
+            content: str,
+            task_id: Optional[str] = None,
+            project_id: Optional[str] = None
+        ):
+            """Add a comment to a task or project."""
+            # Validation: must specify exactly one of task_id or project_id
+            if task_id and project_id:
+                raise ValueError("Comment must be for either task or project, not both")
+            if not task_id and not project_id:
+                raise ValueError("Must specify either task_id or project_id")
+            
+            return self.api.add_comment(
+                content=content, task_id=task_id, project_id=project_id
+            )
+        
+        @self.mcp.tool(name="get_comment")
+        async def get_comment(comment_id: str):
+            """Get a single comment by ID."""
+            return self.api.get_comment(comment_id=comment_id)
+        
+        @self.mcp.tool(name="update_comment")
+        async def update_comment(comment_id: str, content: str):
+            """Update an existing comment."""
+            return self.api.update_comment(
+                comment_id=comment_id, content=content
+            )
+        
+        @self.mcp.tool(name="delete_comment")
+        async def delete_comment(comment_id: str):
+            """Delete a comment."""
+            return self.api.delete_comment(comment_id=comment_id)
     
     def run(self, **kwargs):
         """Run the server."""
