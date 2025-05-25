@@ -27,8 +27,7 @@ class TodoistMCPServer:
         @self.mcp.tool(name="get_projects")
         async def get_projects(limit: Optional[int] = None, cursor: Optional[str] = None):
             """Get projects with optional pagination."""
-            result = self.api.get_projects(limit=limit, cursor=cursor)
-            return result
+            return self.api.get_projects(limit=limit, cursor=cursor)
         
         @self.mcp.tool(name="get_project")
         async def get_project(project_id: str):
@@ -124,12 +123,6 @@ class TodoistMCPServer:
             project_id: Optional[str] = None
         ):
             """Add a comment to a task or project."""
-            # Validation: must specify exactly one of task_id or project_id
-            if task_id and project_id:
-                raise ValueError("Comment must be for either task or project, not both")
-            if not task_id and not project_id:
-                raise ValueError("Must specify either task_id or project_id")
-            
             return self.api.add_comment(
                 content=content, task_id=task_id, project_id=project_id
             )
@@ -159,10 +152,6 @@ class TodoistMCPServer:
             parent_id: Optional[str] = None
         ):
             """Move a task to a different project, section, or parent."""
-            # Validation: must specify at least one target
-            if not any([project_id, section_id, parent_id]):
-                raise ValueError("Must specify at least one target: project_id, section_id, or parent_id")
-            
             return self.api.move_task(
                 task_id=task_id,
                 project_id=project_id,
