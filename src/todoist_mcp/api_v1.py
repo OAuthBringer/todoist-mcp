@@ -188,6 +188,29 @@ class TodoistV1Client:
         data = {"order": order}
         return self._request("POST", f"sections/{section_id}/move", json=data)
     
+    def get_labels(self, limit: Optional[int] = None, cursor: Optional[str] = None) -> Dict[str, Any]:
+        """Get labels with pagination support."""
+        params = self._build_params(limit=limit, cursor=cursor)
+        return self._request("GET", "labels", params=params)
+    
+    def get_label(self, label_id: str) -> Dict[str, Any]:
+        """Get a single label by ID."""
+        return self._request("GET", f"labels/{label_id}")
+    
+    def add_label(self, name: str, color: Optional[str] = None, order: Optional[int] = None) -> Dict[str, Any]:
+        """Create a new label."""
+        data = self._build_params(name=name, color=color, order=order)
+        return self._request("POST", "labels", json=data)
+    
+    def update_label(self, label_id: str, **kwargs) -> Dict[str, Any]:
+        """Update an existing label."""
+        data = self._build_params(**kwargs)
+        return self._request("POST", f"labels/{label_id}", json=data)
+    
+    def delete_label(self, label_id: str) -> None:
+        """Delete a label."""
+        return self._request("DELETE", f"labels/{label_id}")
+    
     def close(self):
         """Close the HTTP client."""
         self.client.close()

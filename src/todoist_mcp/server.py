@@ -158,6 +158,48 @@ class TodoistMCPServer:
                 section_id=section_id,
                 parent_id=parent_id
             )
+        
+        @self.mcp.tool(name="get_labels")
+        async def get_labels(
+            limit: Optional[int] = None,
+            cursor: Optional[str] = None
+        ):
+            """Get labels with optional pagination."""
+            return self.api.get_labels(limit=limit, cursor=cursor)
+        
+        @self.mcp.tool(name="get_label")
+        async def get_label(label_id: str):
+            """Get a single label by ID."""
+            return self.api.get_label(label_id=label_id)
+        
+        @self.mcp.tool(name="add_label")
+        async def add_label(
+            name: str,
+            color: Optional[str] = None,
+            order: Optional[int] = None
+        ):
+            """Create a new label."""
+            return self.api.add_label(name=name, color=color, order=order)
+        
+        @self.mcp.tool(name="update_label")
+        async def update_label(
+            label_id: str,
+            name: Optional[str] = None,
+            color: Optional[str] = None,
+            order: Optional[int] = None
+        ):
+            """Update an existing label."""
+            return self.api.update_label(
+                label_id=label_id,
+                name=name,
+                color=color,
+                order=order
+            )
+        
+        @self.mcp.tool(name="delete_label")
+        async def delete_label(label_id: str):
+            """Delete a label."""
+            return self.api.delete_label(label_id=label_id)
     
     def run(self, **kwargs):
         """Run the server."""
