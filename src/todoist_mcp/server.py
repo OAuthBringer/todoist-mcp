@@ -257,39 +257,7 @@ class TodoistMCPServer:
             """Batch complete multiple tasks."""
             return self.api.batch_complete_tasks(task_ids=task_ids)
         
-        @self.mcp.tool(name="search_tasks")
-        async def search_tasks(
-            query: Optional[str] = None,
-            labels: Optional[List[str]] = None,
-            priority: Optional[int] = None,
-            due_date: Optional[str] = None,
-            due_after: Optional[str] = None,
-            due_before: Optional[str] = None,
-            project_id: Optional[str] = None,
-            is_completed: Optional[bool] = None,
-            assignee_id: Optional[str] = None,
-            sort_by: Optional[str] = None,
-            sort_order: Optional[str] = None,
-            limit: Optional[int] = None,
-            cursor: Optional[str] = None
-        ):
-            """Search tasks with various filters including content, labels, priority, and dates."""
-            return self.api.search_tasks(
-                query=query,
-                labels=labels,
-                priority=priority,
-                due_date=due_date,
-                due_after=due_after,
-                due_before=due_before,
-                project_id=project_id,
-                is_completed=is_completed,
-                assignee_id=assignee_id,
-                sort_by=sort_by,
-                sort_order=sort_order,
-                limit=limit,
-                cursor=cursor
-            )
-        
+
         @self.mcp.tool(name="get_sections")
         async def get_sections(
             project_id: str,
