@@ -200,6 +200,62 @@ class TodoistMCPServer:
         async def delete_label(label_id: str):
             """Delete a label."""
             return self.api.delete_label(label_id=label_id)
+        
+        @self.mcp.tool(name="batch_move_tasks")
+        async def batch_move_tasks(
+            task_ids: List[str],
+            project_id: Optional[str] = None,
+            section_id: Optional[str] = None
+        ):
+            """Batch move multiple tasks to a project or section."""
+            return self.api.batch_move_tasks(
+                task_ids=task_ids,
+                project_id=project_id,
+                section_id=section_id
+            )
+        
+        @self.mcp.tool(name="batch_update_labels")
+        async def batch_update_labels(
+            task_ids: List[str],
+            add_labels: Optional[List[str]] = None,
+            remove_labels: Optional[List[str]] = None
+        ):
+            """Batch update labels for multiple tasks."""
+            return self.api.batch_update_labels(
+                task_ids=task_ids,
+                add_labels=add_labels,
+                remove_labels=remove_labels
+            )
+        
+        @self.mcp.tool(name="batch_update_tasks")
+        async def batch_update_tasks(
+            task_ids: List[str],
+            content: Optional[str] = None,
+            description: Optional[str] = None,
+            labels: Optional[List[str]] = None,
+            priority: Optional[int] = None,
+            due_string: Optional[str] = None,
+            due_date: Optional[str] = None,
+            due_datetime: Optional[str] = None,
+            due_lang: Optional[str] = None,
+            assignee_id: Optional[str] = None,
+            duration: Optional[int] = None,
+            duration_unit: Optional[str] = None
+        ):
+            """Batch update multiple tasks with same properties."""
+            kwargs = self.api._build_params(
+                content=content, description=description, labels=labels,
+                priority=priority, due_string=due_string, due_date=due_date,
+                due_datetime=due_datetime, due_lang=due_lang,
+                assignee_id=assignee_id, duration=duration,
+                duration_unit=duration_unit
+            )
+            return self.api.batch_update_tasks(task_ids=task_ids, **kwargs)
+        
+        @self.mcp.tool(name="batch_complete_tasks")
+        async def batch_complete_tasks(task_ids: List[str]):
+            """Batch complete multiple tasks."""
+            return self.api.batch_complete_tasks(task_ids=task_ids)
     
     def run(self, **kwargs):
         """Run the server."""

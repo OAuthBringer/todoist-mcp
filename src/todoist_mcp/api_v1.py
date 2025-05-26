@@ -211,6 +211,110 @@ class TodoistV1Client:
         """Delete a label."""
         return self._request("DELETE", f"labels/{label_id}")
     
+    def batch_move_tasks(self, task_ids: List[str], project_id: Optional[str] = None,
+                        section_id: Optional[str] = None) -> Dict[str, Any]:
+        """Batch move multiple tasks to a project or section."""
+        if not task_ids:
+            raise ValueError("Task list cannot be empty")
+        if len(task_ids) > 100:
+            raise ValueError("Maximum 100 tasks allowed per batch")
+        if not project_id and not section_id:
+            raise ValueError("Must specify either project_id or section_id")
+        
+        moved = []
+        failed = []
+        
+        for task_id in task_ids:
+            try:
+                self.move_task(task_id, project_id=project_id, section_id=section_id)
+                moved.append(task_id)
+            except Exception as e:
+                failed.append({"task_id": task_id, "error": str(e)})
+        
+        return {"moved": moved, "failed": failed}
+    
+    def batch_update_labels(self, task_ids: List[str], add_labels: Optional[List[str]] = None,
+                           remove_labels: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Batch update labels for multiple tasks."""
+        if not task_ids:
+            raise ValueError("Task list cannot be empty")
+        if len(task_ids) > 100:
+            raise ValueError("Maximum 100 tasks allowed per batch")
+        if not add_labels and not remove_labels:
+            raise ValueError("Must specify either add_labels or remove_labels")
+        
+        updated = []
+        failed = []
+        
+        for task_id in task_ids:
+            try:
+                # Get current task to preserve/modify labels
+                task = self.get_task(task_id)
+                current_labels = task.get("labels", [])
+                
+                # Apply label changes
+                new_labels = current_labels.copy()
+                if add_labels:
+                    for label in add_labels:
+                        if label not in new_labels:
+                            new_labels.append(label)
+                if remove_labels:
+                    new_labels = [l for l in new_labels if l not in remove_labels]
+                
+                # Update task with new labels
+                self.update_task(task_id, labels=new_labels)
+                updated.append(task_id)
+            except Exception as e:
+                failed.append({"task_id": task_id, "error": str(e)})
+        
+        return {"updated": updated, "failed": failed}
+    
+    def batch_update_tasks(self, task_ids: List[str], **kwargs) -> Dict[str, Any]:
+        """Batch update multiple tasks with same properties."""
+        if not task_ids:
+            raise ValueError("Task list cannot be empty")
+        if len(task_ids) > 100:
+            raise ValueError("Maximum 100 tasks allowed per batch")
+        if not kwargs:
+            raise ValueError("No update parameters provided")
+        
+        updated = []
+        failed = []
+        
+        for task_id in task_ids:
+            try:
+                self.update_task(task_id, **kwargs)
+                updated.append(task_id)
+            except Exception as e:
+                failed.append({"task_id": task_id, "error": str(e)})
+        
+        return {"updated": updated, "failed": failed}
+    
+    def batch_complete_tasks(self, task_ids: List[str]) -> Dict[str, Any]:
+        """Batch complete multiple tasks."""
+        if not task_ids:
+            raise ValueError("Task list cannot be empty")
+        if len(task_ids) > 100:
+            raise ValueError("Maximum 100 tasks allowed per batch")
+        
+        completed = []
+        failed = []
+        
+        for task_id in task_ids:
+            try:
+                # Complete task by closing it
+                self._request("POST", f"tasks/{task_id}/close")
+                completed.append(task_id)
+            except Exception as e:
+                error_msg = str(e)
+                if "already" in error_msg.lower():
+                    error_msg = "Already completed"
+                elif "not found" in error_msg.lower():
+                    error_msg = "Task not found"
+                failed.append({"task_id": task_id, "error": error_msg})
+        
+        return {"completed": completed, "failed": failed}
+    
     def close(self):
         """Close the HTTP client."""
         self.client.close()
