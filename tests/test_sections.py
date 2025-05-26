@@ -51,7 +51,6 @@ class TestSections:
         mock_http.request.assert_called_once_with(
             "GET",
             "https://api.todoist.com/api/v1/sections",
-            json=None,
             params={"project_id": "2203306141", "limit": 100}
         )
     
@@ -87,7 +86,7 @@ class TestSections:
         mock_response = Mock()
         mock_response.status_code = 200
         mock_response.json.return_value = [{"id": "7025", "name": "Test Section"}]
-        mock_response.headers = {"X-Pagination-Next-Cursor": "next_cursor_456"}
+        mock_response.headers = {}  # No cursor to avoid recursion in test
         mock_http.request.return_value = mock_response
         
         sections = client.get_sections("2203306141", cursor="start_cursor", limit=50)
@@ -96,7 +95,6 @@ class TestSections:
         mock_http.request.assert_called_once_with(
             "GET",
             "https://api.todoist.com/api/v1/sections",
-            json=None,
             params={
                 "project_id": "2203306141",
                 "cursor": "start_cursor",

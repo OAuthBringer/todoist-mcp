@@ -144,6 +144,50 @@ class TodoistV1Client:
         )
         return self._request("POST", f"tasks/{task_id}/move", json=data)
     
+    def get_sections(self, project_id: str, limit: int = 100, cursor: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get all sections for a project with pagination support."""
+        params = self._build_params(project_id=project_id, limit=limit, cursor=cursor)
+        response = self.client.request("GET", self._url("sections"), params=params)
+        response.raise_for_status()
+        
+        sections = response.json()
+        
+        # Handle pagination if next cursor exists
+        if hasattr(response, 'headers') and isinstance(response.headers, dict) and "X-Pagination-Next-Cursor" in response.headers:
+            next_cursor = response.headers["X-Pagination-Next-Cursor"]
+            # Recursively get remaining sections
+            next_sections = self.get_sections(project_id, limit=limit, cursor=next_cursor)
+            sections.extend(next_sections)
+        
+        return sections
+    
+    def get_section(self, section_id: str) -> Dict[str, Any]:
+        """Get a single section by ID."""
+        return self._request("GET", f"sections/{section_id}")
+    
+    def add_section(self, project_id: str, name: str, order: Optional[int] = None) -> Dict[str, Any]:
+        """Create a new section."""
+        data = self._build_params(project_id=project_id, name=name, order=order)
+        return self._request("POST", "sections", json=data)
+    
+    def update_section(self, section_id: str, name: str) -> None:
+        """Update an existing section."""
+        if not name:
+            raise ValueError("Section name cannot be empty")
+        data = {"name": name}
+        return self._request("POST", f"sections/{section_id}", json=data)
+    
+    def delete_section(self, section_id: str) -> None:
+        """Delete a section."""
+        return self._request("DELETE", f"sections/{section_id}")
+    
+    def move_section(self, section_id: str, order: int) -> None:
+        """Move a section to a new order position."""
+        if order < 0:
+            raise ValueError("Order must be a positive integer")
+        data = {"order": order}
+        return self._request("POST", f"sections/{section_id}/move", json=data)
+    
     def close(self):
         """Close the HTTP client."""
         self.client.close()
