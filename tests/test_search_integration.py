@@ -50,7 +50,7 @@ def test_tasks_varied(server, test_project, test_labels):
     
     # Task with unique content
     tasks.append(server.api.add_task(
-        content="Unique search keyword task",
+        content="Task with unique keyword in content",
         project_id=test_project["id"],
         priority=1
     ))
@@ -90,72 +90,97 @@ class TestSearchIntegration:
     """Integration tests for search functionality against real API."""
     
     @pytest.mark.integration
-    def test_search_by_content(self, server, test_tasks_varied):
-        """Test basic task retrieval (search not working as expected)."""
-        # Note: Search functionality appears to not work with current filter implementation
-        # Just verify we can get tasks
-        result = server.api.search_tasks()
+    def test_search_by_content(self, server, test_tasks_varied, test_project):
+        """Test searching tasks by content.
+        
+        Note: Uses client-side filtering due to Todoist API limitations.
+        Project filter used to reduce dataset size.
+        """
+        result = server.api.search_tasks(query="unique keyword", project_id=test_project["id"])
         
         assert "tasks" in result
         assert "total_count" in result
-        assert isinstance(result["tasks"], list)
+        assert result["total_count"] >= 1
+        
+        # Verify we found the task with unique keyword
+        found = any("unique keyword" in task["content"].lower() 
+                   for task in result["tasks"])
+        assert found, "Test task with 'unique keyword' not found"
     
     @pytest.mark.integration
-    def test_search_by_priority(self, server, test_tasks_varied):
-        """Test search structure for priority filter."""
-        result = server.api.search_tasks(priority=4)
+    def test_search_by_priority(self, server, test_tasks_varied, test_project):
+        """Test searching tasks by priority."""
+        result = server.api.search_tasks(priority=4, project_id=test_project["id"])
         
         assert "tasks" in result
-        assert "total_count" in result
-        assert isinstance(result["tasks"], list)
+        assert result["total_count"] >= 1
+        
+        # All returned tasks should have priority 4
+        for task in result["tasks"]:
+            assert task["priority"] == 4
     
     @pytest.mark.integration
-    def test_search_by_labels(self, server, test_tasks_varied, test_labels):
-        """Test search structure for label filter."""
-        result = server.api.search_tasks(labels=[test_labels[0]["name"]])
+    def test_search_by_labels(self, server, test_tasks_varied, test_labels, test_project):
+        """Test searching tasks by labels."""
+        result = server.api.search_tasks(labels=[test_labels[0]["name"]], project_id=test_project["id"])
         
         assert "tasks" in result
-        assert "total_count" in result
-        assert isinstance(result["tasks"], list)
+        assert result["total_count"] >= 1
+        
+        # Check that tasks have the label
+        for task in result["tasks"]:
+            assert test_labels[0]["name"] in task.get("labels", [])
     
     @pytest.mark.integration
     def test_search_by_project(self, server, test_tasks_varied, test_project):
-        """Test search structure for project filter."""
+        """Test searching tasks by project."""
         result = server.api.search_tasks(project_id=test_project["id"])
         
         assert "tasks" in result
-        assert "total_count" in result
-        assert isinstance(result["tasks"], list)
+        # Should find our 5 test tasks
+        assert result["total_count"] >= 5
+        
+        # All tasks should be from test project
+        for task in result["tasks"]:
+            assert task["project_id"] == test_project["id"]
     
     @pytest.mark.integration
     def test_search_with_multiple_filters(self, server, test_tasks_varied, test_project):
-        """Test search structure with multiple filters."""
+        """Test search with multiple filters combined."""
         result = server.api.search_tasks(
             project_id=test_project["id"],
             priority=1
         )
         
         assert "tasks" in result
-        assert "total_count" in result
-        assert isinstance(result["tasks"], list)
+        assert result["total_count"] >= 1
+        
+        # Verify filters are applied
+        for task in result["tasks"]:
+            assert task["project_id"] == test_project["id"]
+            assert task["priority"] == 1
     
     @pytest.mark.integration
-    def test_search_empty_results(self, server):
+    def test_search_empty_results(self, server, test_project):
         """Test search with no matching results."""
-        result = server.api.search_tasks(query="xyznonexistentquery123")
+        result = server.api.search_tasks(query="xyznonexistentquery123", project_id=test_project["id"])
         
         assert "tasks" in result
         assert result["total_count"] == 0
         assert result["tasks"] == []
     
     @pytest.mark.integration
-    def test_search_with_due_date(self, server, test_tasks_varied):
-        """Test search structure for due date filter."""
-        result = server.api.search_tasks(due_date="tomorrow")
+    def test_search_with_due_date(self, server, test_tasks_varied, test_project):
+        """Test searching tasks by due date."""
+        result = server.api.search_tasks(due_date="tomorrow", project_id=test_project["id"])
         
         assert "tasks" in result
-        assert "total_count" in result
-        assert isinstance(result["tasks"], list)
+        # Should find at least our test task with due date
+        assert result["total_count"] >= 1
+        
+        # All tasks should have a due date
+        for task in result["tasks"]:
+            assert task.get("due") is not None
     
     @pytest.mark.integration
     def test_search_completed_filter(self, server, test_project):
@@ -203,20 +228,26 @@ class TestSearchIntegration:
             server.api.search_tasks(priority=5)
     
     @pytest.mark.integration
-    def test_search_by_multiple_labels(self, server, test_tasks_varied, test_labels):
-        """Test search structure with multiple labels."""
+    def test_search_by_multiple_labels(self, server, test_tasks_varied, test_labels, test_project):
+        """Test searching with multiple labels (OR logic)."""
         result = server.api.search_tasks(
-            labels=[test_labels[0]["name"], test_labels[1]["name"]]
+            labels=[test_labels[0]["name"], test_labels[1]["name"]],
+            project_id=test_project["id"]
         )
         
         assert "tasks" in result
-        assert "total_count" in result
-        assert isinstance(result["tasks"], list)
+        assert result["total_count"] >= 1
+        
+        # Tasks should have at least one of the labels
+        for task in result["tasks"]:
+            task_labels = task.get("labels", [])
+            has_label = any(label in task_labels for label in [test_labels[0]["name"], test_labels[1]["name"]])
+            assert has_label
     
     @pytest.mark.integration
-    def test_search_response_structure(self, server, test_tasks_varied):
+    def test_search_response_structure(self, server, test_tasks_varied, test_project):
         """Test search response has expected structure."""
-        result = server.api.search_tasks(query="search")
+        result = server.api.search_tasks(query="search", project_id=test_project["id"])
         
         assert isinstance(result, dict)
         assert "tasks" in result
