@@ -315,6 +315,85 @@ class TodoistV1Client:
         
         return {"completed": completed, "failed": failed}
     
+    def search_tasks(self, query: Optional[str] = None, labels: Optional[List[str]] = None,
+                    priority: Optional[int] = None, due_date: Optional[str] = None,
+                    due_after: Optional[str] = None, due_before: Optional[str] = None,
+                    project_id: Optional[str] = None, is_completed: Optional[bool] = None,
+                    assignee_id: Optional[str] = None, sort_by: Optional[str] = None,
+                    sort_order: Optional[str] = None, limit: Optional[int] = None,
+                    cursor: Optional[str] = None) -> Dict[str, Any]:
+        """Search tasks with various filters."""
+        # Validate priority if provided
+        if priority is not None and priority not in [1, 2, 3, 4]:
+            raise ValueError("Priority must be between 1 and 4")
+        
+        # Build filter string for Todoist API
+        filters = []
+        
+        if query:
+            # Content search is handled via filter parameter
+            filters.append(f"search: {query}")
+        
+        if labels:
+            # Handle multiple labels with OR logic
+            label_filter = " | ".join([f"@{label}" for label in labels])
+            filters.append(f"({label_filter})")
+        
+        if priority:
+            filters.append(f"p{priority}")
+        
+        if due_date:
+            filters.append(f"due: {due_date}")
+        elif due_after and due_before:
+            filters.append(f"due after: {due_after} & due before: {due_before}")
+        elif due_after:
+            filters.append(f"due after: {due_after}")
+        elif due_before:
+            filters.append(f"due before: {due_before}")
+        
+        if project_id:
+            filters.append(f"#project{project_id}")
+        
+        if assignee_id:
+            filters.append(f"assigned to: {assignee_id}")
+        
+        # Build filter string
+        filter_str = " & ".join(filters) if filters else None
+        
+        # Make request to get tasks with filter
+        params = self._build_params(
+            filter=filter_str,
+            limit=limit,
+            cursor=cursor
+        )
+        
+        # Get tasks using the filter
+        response = self._request("GET", "tasks", params=params)
+        
+        # Transform response to search format
+        tasks = response if isinstance(response, list) else response.get("tasks", [])
+        
+        # Apply completed filter if specified
+        if is_completed is not None:
+            tasks = [t for t in tasks if t.get("is_completed", False) == is_completed]
+        
+        # Sort tasks if requested
+        if sort_by and tasks:
+            reverse = sort_order == "desc" if sort_order else False
+            tasks.sort(key=lambda t: t.get(sort_by, ""), reverse=reverse)
+        
+        # Build search response
+        result = {
+            "tasks": tasks,
+            "total_count": len(tasks)
+        }
+        
+        # Add cursor if more results available
+        if hasattr(response, "get") and "next_cursor" in response:
+            result["next_cursor"] = response["next_cursor"]
+        
+        return result
+    
     def close(self):
         """Close the HTTP client."""
         self.client.close()
