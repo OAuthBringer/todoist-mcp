@@ -37,6 +37,30 @@ class TestLabelsSupport:
         assert "get_labels" in tools
     
     @pytest.mark.asyncio
+    async def test_get_label_tool_exists(self, server):
+        """Test that get_label tool is registered."""
+        tools = await server.mcp.get_tools()
+        assert "get_label" in tools
+    
+    @pytest.mark.asyncio
+    async def test_add_label_tool_exists(self, server):
+        """Test that add_label tool is registered."""
+        tools = await server.mcp.get_tools()
+        assert "add_label" in tools
+    
+    @pytest.mark.asyncio
+    async def test_update_label_tool_exists(self, server):
+        """Test that update_label tool is registered."""
+        tools = await server.mcp.get_tools()
+        assert "update_label" in tools
+    
+    @pytest.mark.asyncio
+    async def test_delete_label_tool_exists(self, server):
+        """Test that delete_label tool is registered."""
+        tools = await server.mcp.get_tools()
+        assert "delete_label" in tools
+    
+    @pytest.mark.asyncio
     async def test_get_labels_with_pagination(self, server, mock_api_client):
         """Test getting all labels with pagination support."""
         mock_instance = mock_api_client.return_value

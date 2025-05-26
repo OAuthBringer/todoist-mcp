@@ -28,6 +28,48 @@ def server(mock_auth_manager, mock_api_client):
 
 
 class TestTodoistMCPServer:
+    @pytest.mark.asyncio
+    async def test_get_projects_tool_exists(self, server):
+        """Test that get_projects tool is registered."""
+        tools = await server.mcp.get_tools()
+        assert "get_projects" in tools
+    
+    @pytest.mark.asyncio
+    async def test_get_project_tool_exists(self, server):
+        """Test that get_project tool is registered."""
+        tools = await server.mcp.get_tools()
+        assert "get_project" in tools
+    
+    @pytest.mark.asyncio
+    async def test_add_project_tool_exists(self, server):
+        """Test that add_project tool is registered."""
+        tools = await server.mcp.get_tools()
+        assert "add_project" in tools
+    
+    @pytest.mark.asyncio
+    async def test_get_tasks_tool_exists(self, server):
+        """Test that get_tasks tool is registered."""
+        tools = await server.mcp.get_tools()
+        assert "get_tasks" in tools
+    
+    @pytest.mark.asyncio
+    async def test_get_task_tool_exists(self, server):
+        """Test that get_task tool is registered."""
+        tools = await server.mcp.get_tools()
+        assert "get_task" in tools
+    
+    @pytest.mark.asyncio
+    async def test_add_task_tool_exists(self, server):
+        """Test that add_task tool is registered."""
+        tools = await server.mcp.get_tools()
+        assert "add_task" in tools
+    
+    @pytest.mark.asyncio
+    async def test_update_task_tool_exists(self, server):
+        """Test that update_task tool is registered."""
+        tools = await server.mcp.get_tools()
+        assert "update_task" in tools
+    
     def test_init_with_token(self, mock_api_client):
         """Test server initialization with provided token."""
         server = TodoistMCPServer(token="provided_token")
