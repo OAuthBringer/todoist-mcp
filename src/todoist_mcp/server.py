@@ -289,6 +289,50 @@ class TodoistMCPServer:
                 limit=limit,
                 cursor=cursor
             )
+        
+        @self.mcp.tool(name="get_sections")
+        async def get_sections(
+            project_id: str,
+            limit: Optional[int] = None,
+            cursor: Optional[str] = None
+        ):
+            """Get all sections for a project with optional pagination."""
+            return self.api.get_sections(
+                project_id=project_id,
+                limit=limit or 100,
+                cursor=cursor
+            )
+        
+        @self.mcp.tool(name="get_section")
+        async def get_section(section_id: str):
+            """Get a single section by ID."""
+            return self.api.get_section(section_id=section_id)
+        
+        @self.mcp.tool(name="add_section")
+        async def add_section(
+            project_id: str,
+            name: str,
+            order: Optional[int] = None
+        ):
+            """Create a new section."""
+            return self.api.add_section(
+                project_id=project_id,
+                name=name,
+                order=order
+            )
+        
+        @self.mcp.tool(name="update_section")
+        async def update_section(section_id: str, name: str):
+            """Update an existing section."""
+            return self.api.update_section(
+                section_id=section_id,
+                name=name
+            )
+        
+        @self.mcp.tool(name="delete_section")
+        async def delete_section(section_id: str):
+            """Delete a section."""
+            return self.api.delete_section(section_id=section_id)
     
     def run(self, **kwargs):
         """Run the server."""
