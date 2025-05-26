@@ -1,212 +1,217 @@
-"""Tests for Task-Section Integration - TDD Failing Tests."""
+"""Integration tests for Task-Section functionality - Real API Testing."""
 
 import pytest
-from unittest.mock import Mock, patch
+import os
+from dotenv import load_dotenv
 from todoist_mcp.server import TodoistMCPServer
+from .conftest_integration import test_project_manager, cleanup_test_projects
+
+load_dotenv()
 
 
 @pytest.fixture
-def mock_auth_manager():
-    """Mock AuthManager."""
-    with patch("todoist_mcp.server.AuthManager") as mock:
-        instance = mock.return_value
-        instance.get_token.return_value = "test_token"
-        yield mock
+def server():
+    """Create server instance with real API token."""
+    token = os.getenv("TODOIST_API_TOKEN")
+    if not token:
+        pytest.skip("TODOIST_API_TOKEN not set")
+    return TodoistMCPServer(token=token)
 
 
 @pytest.fixture
-def mock_api_client():
-    """Mock TodoistV1Client."""
-    with patch("todoist_mcp.server.TodoistV1Client") as mock:
-        yield mock
-
-
-@pytest.fixture
-def server(mock_auth_manager, mock_api_client):
-    """Create server instance with mocked dependencies."""
-    return TodoistMCPServer()
+def test_project_with_sections(server, test_project_manager):
+    """Create a test project with sections."""
+    project = test_project_manager("TaskSection")
+    
+    # Create sections
+    section1 = server.api.add_section(
+        project_id=project["id"],
+        name="Section A"
+    )
+    section2 = server.api.add_section(
+        project_id=project["id"],
+        name="Section B"
+    )
+    
+    return {
+        "project": project,
+        "section1": section1,
+        "section2": section2
+    }
 
 
 class TestTaskSectionIntegration:
-    """Test suite for task-section integration - ALL SHOULD FAIL INITIALLY."""
+    """Integration tests for task-section operations against real API."""
     
-    @pytest.mark.asyncio
-    async def test_move_task_with_section_id_passes_parameter(self, server, mock_api_client):
-        """Test that move_task correctly passes section_id to API."""
-        mock_instance = mock_api_client.return_value
-        mock_instance.move_task.return_value = {
-            "id": "task123",
-            "content": "Task in section",
-            "section_id": "section456"
-        }
+    @pytest.mark.integration
+    def test_create_task_in_section(self, server, test_project_with_sections):
+        """Test creating a task directly in a section."""
+        project = test_project_with_sections["project"]
+        section = test_project_with_sections["section1"]
         
-        # Execute move
-        result = server.api.move_task(
-            task_id="task123",
-            section_id="section456"
+        # Create task in section
+        task = server.api.add_task(
+            content="Task in Section A",
+            project_id=project["id"],
+            section_id=section["id"]
         )
         
-        # Verify section_id was passed to API call
-        mock_instance.move_task.assert_called_once_with(
-            task_id="task123",
-            section_id="section456"
-        )
-        assert result["section_id"] == "section456"
+        assert task["id"] is not None
+        assert task["section_id"] == section["id"]
+        assert task["project_id"] == project["id"]
+        
+        # Verify task appears in section filter
+        tasks = server.api.get_tasks(section_id=section["id"])
+        task_ids = [t["id"] for t in tasks.get("results", tasks)]
+        assert task["id"] in task_ids
     
-    @pytest.mark.asyncio
-    async def test_get_tasks_returns_section_id_in_results(self, server, mock_api_client):
-        """Test that get_tasks includes section_id in task responses."""
-        mock_instance = mock_api_client.return_value
-        mock_instance.get_tasks.return_value = {
-            "results": [
-                {
-                    "id": "task1",
-                    "content": "Task in section",
-                    "project_id": "proj123",
-                    "section_id": "section789"  # This should be included
-                },
-                {
-                    "id": "task2",
-                    "content": "Task without section",
-                    "project_id": "proj123",
-                    "section_id": None  # Tasks not in a section should have null
-                }
-            ],
-            "next_cursor": None
-        }
+    @pytest.mark.integration
+    def test_move_task_between_sections(self, server, test_project_with_sections):
+        """Test moving a task from one section to another."""
+        project = test_project_with_sections["project"]
+        section1 = test_project_with_sections["section1"]
+        section2 = test_project_with_sections["section2"]
         
-        # Get tasks
-        result = server.api.get_tasks(project_id="proj123")
-        
-        # Verify section_id is present in results
-        assert "section_id" in result["results"][0]
-        assert result["results"][0]["section_id"] == "section789"
-        assert "section_id" in result["results"][1]
-        assert result["results"][1]["section_id"] is None
-    
-    @pytest.mark.asyncio
-    async def test_get_tasks_filters_by_section_id(self, server, mock_api_client):
-        """Test that get_tasks correctly filters by section_id."""
-        mock_instance = mock_api_client.return_value
-        # Mock should only return tasks from the requested section
-        mock_instance.get_tasks.return_value = {
-            "results": [
-                {
-                    "id": "task1",
-                    "content": "Task in requested section",
-                    "project_id": "proj123",
-                    "section_id": "section456"
-                }
-            ],
-            "next_cursor": None
-        }
-        
-        # Get tasks filtered by section
-        result = server.api.get_tasks(
-            project_id="proj123",
-            section_id="section456"
+        # Create task in first section
+        task = server.api.add_task(
+            content="Task to move",
+            project_id=project["id"],
+            section_id=section1["id"]
         )
         
-        # Verify API was called with section_id filter
-        mock_instance.get_tasks.assert_called_once_with(
-            project_id="proj123",
-            section_id="section456"
+        # Move to second section
+        moved_task = server.api.move_task(
+            task_id=task["id"],
+            section_id=section2["id"]
         )
         
-        # Verify only tasks from that section returned
-        assert len(result["results"]) == 1
-        assert result["results"][0]["section_id"] == "section456"
+        assert moved_task["section_id"] == section2["id"]
+        
+        # Verify task no longer in first section
+        section1_tasks = server.api.get_tasks(section_id=section1["id"])
+        section1_task_ids = [t["id"] for t in section1_tasks.get("results", section1_tasks)]
+        assert task["id"] not in section1_task_ids
+        
+        # Verify task is in second section
+        section2_tasks = server.api.get_tasks(section_id=section2["id"])
+        section2_task_ids = [t["id"] for t in section2_tasks.get("results", section2_tasks)]
+        assert task["id"] in section2_task_ids
     
-    @pytest.mark.asyncio
-    async def test_get_task_includes_section_id(self, server, mock_api_client):
-        """Test that get_task includes section_id in single task response."""
-        mock_instance = mock_api_client.return_value
-        mock_instance.get_task.return_value = {
-            "id": "task123",
-            "content": "Single task",
-            "project_id": "proj456",
-            "section_id": "section789"
-        }
+    @pytest.mark.integration
+    def test_move_task_to_different_project(self, server, test_project_manager):
+        """Test moving a task to a different project removes section association."""
+        # Create two projects
+        project1 = test_project_manager("MoveSource")
+        project2 = test_project_manager("MoveDestination")
+        
+        # Create section in first project
+        section = server.api.add_section(
+            project_id=project1["id"],
+            name="Source Section"
+        )
+        
+        # Create task in section
+        task = server.api.add_task(
+            content="Task to move projects",
+            project_id=project1["id"],
+            section_id=section["id"]
+        )
+        
+        # Move to different project (should clear section_id)
+        moved_task = server.api.move_task(
+            task_id=task["id"],
+            project_id=project2["id"]
+        )
+        
+        # Verify task is in new project without section
+        assert moved_task["project_id"] == project2["id"]
+        assert moved_task["section_id"] is None
+    
+    @pytest.mark.integration
+    def test_get_tasks_by_section(self, server, test_project_with_sections):
+        """Test filtering tasks by section."""
+        project = test_project_with_sections["project"]
+        section1 = test_project_with_sections["section1"]
+        section2 = test_project_with_sections["section2"]
+        
+        # Create tasks in different sections
+        task1 = server.api.add_task(
+            content="Task in Section A",
+            project_id=project["id"],
+            section_id=section1["id"]
+        )
+        task2 = server.api.add_task(
+            content="Another task in Section A",
+            project_id=project["id"],
+            section_id=section1["id"]
+        )
+        task3 = server.api.add_task(
+            content="Task in Section B",
+            project_id=project["id"],
+            section_id=section2["id"]
+        )
+        task_no_section = server.api.add_task(
+            content="Task without section",
+            project_id=project["id"]
+        )
+        
+        # Get tasks from section 1
+        section1_tasks = server.api.get_tasks(section_id=section1["id"])
+        section1_contents = [t["content"] for t in section1_tasks.get("results", section1_tasks)]
+        
+        assert "Task in Section A" in section1_contents
+        assert "Another task in Section A" in section1_contents
+        assert "Task in Section B" not in section1_contents
+        assert "Task without section" not in section1_contents
+    
+    @pytest.mark.integration
+    def test_task_includes_section_id(self, server, test_project_with_sections):
+        """Test that task responses include section_id field."""
+        project = test_project_with_sections["project"]
+        section = test_project_with_sections["section1"]
+        
+        # Create task in section
+        task = server.api.add_task(
+            content="Test task",
+            project_id=project["id"],
+            section_id=section["id"]
+        )
         
         # Get single task
-        result = server.api.get_task(task_id="task123")
+        fetched_task = server.api.get_task(task["id"])
+        assert "section_id" in fetched_task
+        assert fetched_task["section_id"] == section["id"]
         
-        # Verify section_id is included
-        assert "section_id" in result
-        assert result["section_id"] == "section789"
+        # Get tasks list
+        tasks = server.api.get_tasks(project_id=project["id"])
+        for task in tasks.get("results", tasks):
+            assert "section_id" in task
     
-    @pytest.mark.asyncio
-    async def test_add_task_with_section_id(self, server, mock_api_client):
-        """Test that add_task accepts and returns section_id."""
-        mock_instance = mock_api_client.return_value
-        mock_instance.add_task.return_value = {
-            "id": "new_task",
-            "content": "New task in section",
-            "project_id": "proj123",
-            "section_id": "section456"
-        }
+    @pytest.mark.integration
+    def test_section_deletion_behavior(self, server, test_project_manager):
+        """Test task behavior when section is deleted."""
+        # Create separate project for this test to avoid cleanup issues
+        project = test_project_manager("SectionDeletion")
         
-        # Add task to specific section
-        result = server.api.add_task(
-            content="New task in section",
-            project_id="proj123",
-            section_id="section456"
+        # Create section and task
+        section = server.api.add_section(
+            project_id=project["id"],
+            name="Temporary Section"
+        )
+        task = server.api.add_task(
+            content="Task in section to delete",
+            project_id=project["id"],
+            section_id=section["id"]
         )
         
-        # Verify section_id was passed to API
-        mock_instance.add_task.assert_called_once_with(
-            content="New task in section",
-            project_id="proj123", 
-            section_id="section456"
-        )
+        # Delete section
+        server.api.delete_section(section["id"])
         
-        # Verify section_id in response
-        assert "section_id" in result
-        assert result["section_id"] == "section456"
-    
-    @pytest.mark.asyncio
-    async def test_update_task_preserves_section_id(self, server, mock_api_client):
-        """Test that update_task preserves section_id in response."""
-        mock_instance = mock_api_client.return_value
-        mock_instance.update_task.return_value = {
-            "id": "task123",
-            "content": "Updated task",
-            "project_id": "proj456",
-            "section_id": "section789"  # Should be preserved
-        }
+        # Task should still exist and reference the deleted section
+        fetched_task = server.api.get_task(task["id"])
+        assert fetched_task["section_id"] == section["id"]  # Section ID remains
+        assert fetched_task["project_id"] == project["id"]
         
-        # Update task
-        result = server.api.update_task(
-            task_id="task123",
-            content="Updated task"
-        )
-        
-        # Verify section_id is preserved in response
-        assert "section_id" in result
-        assert result["section_id"] == "section789"
-    
-    @pytest.mark.asyncio
-    async def test_move_task_from_section_to_no_section(self, server, mock_api_client):
-        """Test moving task out of a section (section_id = None)."""
-        mock_instance = mock_api_client.return_value
-        mock_instance.move_task.return_value = {
-            "id": "task123",
-            "content": "Task moved out of section",
-            "project_id": "proj456",
-            "section_id": None  # Moved to no section
-        }
-        
-        # Move task to no section by passing None
-        result = server.api.move_task(
-            task_id="task123",
-            section_id=None
-        )
-        
-        # Verify None was passed for section_id
-        mock_instance.move_task.assert_called_once_with(
-            task_id="task123",
-            section_id=None
-        )
-        
-        # Verify task has no section
-        assert result["section_id"] is None
+        # Verify section is marked as deleted
+        deleted_section = server.api.get_section(section["id"])
+        assert deleted_section["is_deleted"] is True
