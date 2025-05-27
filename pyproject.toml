@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "todoist-mcp"
-version = "0.3.0"
+version = "0.4.0"
 description = "FastMCP server for Todoist API integration"
 authors = [{name = "OAuthBringer", email = "your.email@example.com"}]
 license = {text = "MIT"}

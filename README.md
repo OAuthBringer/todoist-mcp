@@ -5,16 +5,30 @@ MCP server for Todoist API integration. Published to [PyPI](https://pypi.org/pro
 ## Status
 ✅ **Full Functionality** - Now using Todoist unified API v1 with proper pagination support
 
-**v0.3.0** - Added Comment CRUD operations and Task Move functionality
+**v0.4.0** - Major expansion: Sections support, Labels management, and Batch operations
+
+### Important API Notes
+Todoist has numerous API versions with incompatible ID systems:
+- **v1 Unified API** (Todoist official ): Uses alphanumeric IDs (e.g., `69mF7QcCj9JmXxp8`)
+- **v2 REST API**: Uses numeric IDs (e.g., `7246645180`)
+
+This incompatibility means certain features like server-side search are not available in this MCP implementation, as search only exists in v2 but returns IDs incompatible with v1 operations.
 
 ## Features
-- Full cursor-based pagination for tasks, projects, and comments
+- Full cursor-based pagination for all endpoints
 - Configurable limit parameter for all list endpoints
 - Multi-auth support (environment, config file, runtime)
 - Complete task and project management capabilities
+- **Sections support** (v0.4.0): CRUD operations for project sections
+- **Labels management** (v0.4.0): CRUD operations for labels
+- **Batch operations** (v0.4.0): Move, update, complete multiple tasks at once
 - Comment CRUD operations for tasks and projects
 - Move tasks between projects, sections, and parents
 - Error handling with detailed error messages
+
+### Limitations
+- No server-side search (due to v1/v2 API incompatibility)
+- Client-side filtering only for task queries
 
 ## Installation
 ```bash
@@ -94,9 +108,29 @@ Authentication options (in order of precedence):
 ### Tasks
 - `get_tasks` - List tasks with pagination and filters
 - `get_task` - Get single task by ID
-- `add_task` - Create new task
+- `add_task` - Create new task with all properties
 - `update_task` - Update existing task
 - `move_task` - Move task to different project, section, or parent
+
+### Sections (v0.4.0)
+- `get_sections` - List sections for a project with pagination
+- `get_section` - Get single section by ID
+- `add_section` - Create new section in project
+- `update_section` - Update section name
+- `delete_section` - Delete a section
+
+### Labels (v0.4.0)
+- `get_labels` - List all labels with pagination
+- `get_label` - Get single label by ID
+- `add_label` - Create new label
+- `update_label` - Update label properties
+- `delete_label` - Delete a label
+
+### Batch Operations (v0.4.0)
+- `batch_move_tasks` - Move multiple tasks to project/section
+- `batch_update_labels` - Add/remove labels from multiple tasks
+- `batch_update_tasks` - Update multiple tasks with same properties
+- `batch_complete_tasks` - Complete multiple tasks at once
 
 ### Comments
 - `get_comments` - List comments for task/project with pagination

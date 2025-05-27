@@ -144,6 +144,166 @@ class TodoistV1Client:
         )
         return self._request("POST", f"tasks/{task_id}/move", json=data)
     
+    def get_sections(self, project_id: str, limit: int = 100, cursor: Optional[str] = None) -> Dict[str, Any]:
+        """Get sections for a project with pagination support."""
+        params = self._build_params(project_id=project_id, limit=limit, cursor=cursor)
+        return self._request("GET", "sections", params=params)
+    
+    def get_section(self, section_id: str) -> Dict[str, Any]:
+        """Get a single section by ID."""
+        return self._request("GET", f"sections/{section_id}")
+    
+    def add_section(self, project_id: str, name: str, order: Optional[int] = None) -> Dict[str, Any]:
+        """Create a new section."""
+        data = self._build_params(project_id=project_id, name=name, order=order)
+        return self._request("POST", "sections", json=data)
+    
+    def update_section(self, section_id: str, name: str) -> Dict[str, Any]:
+        """Update an existing section."""
+        if not name:
+            raise ValueError("Section name cannot be empty")
+        data = {"name": name}
+        return self._request("POST", f"sections/{section_id}", json=data)
+    
+    def delete_section(self, section_id: str) -> None:
+        """Delete a section."""
+        return self._request("DELETE", f"sections/{section_id}")
+    
+    def move_section(self, section_id: str, order: int) -> None:
+        """Move a section to a new order position."""
+        if order < 0:
+            raise ValueError("Order must be a positive integer")
+        data = {"order": order}
+        return self._request("POST", f"sections/{section_id}/move", json=data)
+    
+    def get_labels(self, limit: Optional[int] = None, cursor: Optional[str] = None) -> Dict[str, Any]:
+        """Get labels with pagination support."""
+        params = self._build_params(limit=limit, cursor=cursor)
+        return self._request("GET", "labels", params=params)
+    
+    def get_label(self, label_id: str) -> Dict[str, Any]:
+        """Get a single label by ID."""
+        return self._request("GET", f"labels/{label_id}")
+    
+    def add_label(self, name: str, color: Optional[str] = None, order: Optional[int] = None) -> Dict[str, Any]:
+        """Create a new label."""
+        data = self._build_params(name=name, color=color, order=order)
+        return self._request("POST", "labels", json=data)
+    
+    def update_label(self, label_id: str, **kwargs) -> Dict[str, Any]:
+        """Update an existing label."""
+        data = self._build_params(**kwargs)
+        return self._request("POST", f"labels/{label_id}", json=data)
+    
+    def delete_label(self, label_id: str) -> None:
+        """Delete a label."""
+        return self._request("DELETE", f"labels/{label_id}")
+    
+    def batch_move_tasks(self, task_ids: List[str], project_id: Optional[str] = None,
+                        section_id: Optional[str] = None) -> Dict[str, Any]:
+        """Batch move multiple tasks to a project or section."""
+        if not task_ids:
+            raise ValueError("Task list cannot be empty")
+        if len(task_ids) > 100:
+            raise ValueError("Maximum 100 tasks allowed per batch")
+        if not project_id and not section_id:
+            raise ValueError("Must specify either project_id or section_id")
+        
+        moved = []
+        failed = []
+        
+        for task_id in task_ids:
+            try:
+                self.move_task(task_id, project_id=project_id, section_id=section_id)
+                moved.append(task_id)
+            except Exception as e:
+                failed.append({"task_id": task_id, "error": str(e)})
+        
+        return {"moved": moved, "failed": failed}
+    
+    def batch_update_labels(self, task_ids: List[str], add_labels: Optional[List[str]] = None,
+                           remove_labels: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Batch update labels for multiple tasks."""
+        if not task_ids:
+            raise ValueError("Task list cannot be empty")
+        if len(task_ids) > 100:
+            raise ValueError("Maximum 100 tasks allowed per batch")
+        if not add_labels and not remove_labels:
+            raise ValueError("Must specify either add_labels or remove_labels")
+        
+        updated = []
+        failed = []
+        
+        for task_id in task_ids:
+            try:
+                # Get current task to preserve/modify labels
+                task = self.get_task(task_id)
+                current_labels = task.get("labels", [])
+                
+                # Apply label changes
+                new_labels = current_labels.copy()
+                if add_labels:
+                    for label in add_labels:
+                        if label not in new_labels:
+                            new_labels.append(label)
+                if remove_labels:
+                    new_labels = [l for l in new_labels if l not in remove_labels]
+                
+                # Update task with new labels
+                self.update_task(task_id, labels=new_labels)
+                updated.append(task_id)
+            except Exception as e:
+                failed.append({"task_id": task_id, "error": str(e)})
+        
+        return {"updated": updated, "failed": failed}
+    
+    def batch_update_tasks(self, task_ids: List[str], **kwargs) -> Dict[str, Any]:
+        """Batch update multiple tasks with same properties."""
+        if not task_ids:
+            raise ValueError("Task list cannot be empty")
+        if len(task_ids) > 100:
+            raise ValueError("Maximum 100 tasks allowed per batch")
+        if not kwargs:
+            raise ValueError("No update parameters provided")
+        
+        updated = []
+        failed = []
+        
+        for task_id in task_ids:
+            try:
+                self.update_task(task_id, **kwargs)
+                updated.append(task_id)
+            except Exception as e:
+                failed.append({"task_id": task_id, "error": str(e)})
+        
+        return {"updated": updated, "failed": failed}
+    
+    def batch_complete_tasks(self, task_ids: List[str]) -> Dict[str, Any]:
+        """Batch complete multiple tasks."""
+        if not task_ids:
+            raise ValueError("Task list cannot be empty")
+        if len(task_ids) > 100:
+            raise ValueError("Maximum 100 tasks allowed per batch")
+        
+        completed = []
+        failed = []
+        
+        for task_id in task_ids:
+            try:
+                # Complete task by closing it
+                self._request("POST", f"tasks/{task_id}/close")
+                completed.append(task_id)
+            except Exception as e:
+                error_msg = str(e)
+                if "already" in error_msg.lower():
+                    error_msg = "Already completed"
+                elif "not found" in error_msg.lower():
+                    error_msg = "Task not found"
+                failed.append({"task_id": task_id, "error": error_msg})
+        
+        return {"completed": completed, "failed": failed}
+    
+
     def close(self):
         """Close the HTTP client."""
         self.client.close()
